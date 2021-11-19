@@ -1,0 +1,8 @@
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+gopkg.in/gographics/imagick.v1 v1.1.2 h1:87r9WqElXSeK228sAk9ZJYMSBQ4EneRr2ISuriFrnqs=
+gopkg.in/gographics/imagick.v1 v1.1.2/go.mod h1:TFOIni/g9Hq4JzrNevfvJWBapGD9q0ZdAyEQrO0d5Rg=
+gopkg.in/gographics/imagick.v2 v2.6.0 h1:ewRsUQk3QkjGumERlndbFn/kTYRjyMaPY5gxwpuAhik=
+gopkg.in/gographics/imagick.v2 v2.6.0/go.mod h1:/QVPLV/iKdNttRKthmDkeeGg+vdHurVEPc8zkU0XgBk=
+gopkg.in/gographics/imagick.v3 v3.4.0 h1:kSnbsXOWofo81VJEn/Hw8w3qqoOrfTyWwjAQzSdtPlg=
+gopkg.in/gographics/imagick.v3 v3.4.0/go.mod h1:+Q9nyA2xRZXrDyTtJ/eko+8V/5E7bWYs08ndkZp8UmA=
