@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/goph/emperror"
 	"github.com/op/go-logging"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -137,11 +138,22 @@ func (fs *LocalFs) FileRead(folder, name string, w io.Writer, size int64, opts F
 	return nil
 }
 
-func (fs *LocalFs) FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadCloser, error) {
+func (fs *LocalFs) FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadCloser, string, error) {
 	path := filepath.Join(folder, name)
 	file, err := os.OpenFile(filepath.Join(fs.basepath, path), os.O_RDONLY, 0644)
 	if err != nil {
-		return nil, emperror.Wrapf(err, "cannot open file %v", path)
+		return nil, "", emperror.Wrapf(err, "cannot open file %v", path)
 	}
-	return file, nil
+	// todo: detect mime type
+	return file, "application/octet-stream", nil
+}
+
+func (fs *LocalFs) FileList(folder, name string) ([]os.DirEntry, error) {
+	path := filepath.Join(folder, name)
+	fullpath := filepath.Join(fs.basepath, path)
+	de, err := os.ReadDir(fullpath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot read %s", fullpath)
+	}
+	return de, nil
 }

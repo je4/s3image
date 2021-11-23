@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type S3Fs struct {
@@ -38,6 +39,53 @@ func (fs *S3Fs) Protocol() string {
 
 func (fs *S3Fs) String() string {
 	return fmt.Sprintf(fs.s3.EndpointURL().String())
+}
+
+func (fs *S3Fs) FileList(folder, name string) ([]os.DirEntry, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	objectCh := fs.s3.ListObjects(ctx, folder, minio.ListObjectsOptions{
+		Prefix:    name,
+		Recursive: true,
+	})
+	var result = []os.DirEntry{}
+	var subDirs = []string{}
+	for object := range objectCh {
+		subPath := strings.Trim(strings.TrimPrefix(object.Key, name), "/")
+		if subPath == "" {
+			continue
+		}
+		if strings.ContainsRune(subPath, '/') {
+			subDir := subPath[:strings.IndexByte(subPath, '/')]
+			found := false
+			for _, d := range subDirs {
+				if d == subDir {
+					found = true
+					break
+				}
+			}
+			if !found {
+				subDirs = append(subDirs, subDir)
+			}
+			continue
+		}
+		result = append(result, S3DirEntry{
+			S3FileInfo{
+				bucket: folder,
+				name:   name,
+				info:   object,
+			},
+		})
+	}
+	for _, d := range subDirs {
+		subDir := fmt.Sprintf("%s/%s", name, d)
+		result = append(result, DummyDirEntry{
+			name:     fmt.Sprintf("%s/%s", folder, subDir),
+			isDir:    true,
+			fileMode: 0,
+		})
+	}
+	return result, nil
 }
 
 func (fs *S3Fs) FileStat(folder, name string, opts FileStatOptions) (os.FileInfo, error) {
@@ -155,7 +203,7 @@ func (fs *S3Fs) FileRead(folder, name string, w io.Writer, size int64, opts File
 	return nil
 }
 
-func (fs *S3Fs) FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadCloser, error) {
+func (fs *S3Fs) FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadCloser, string, error) {
 	object, err := fs.s3.GetObject(
 		context.Background(),
 		folder,
@@ -163,7 +211,11 @@ func (fs *S3Fs) FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadC
 		minio.GetObjectOptions{},
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get object %v/%v", folder, name)
+		return nil, "", errors.Wrapf(err, "cannot get object %v/%v", folder, name)
 	}
-	return object, nil
+	oinfo, err := object.Stat()
+	if err != nil {
+		return nil, "", errors.Wrapf(err, "cannot stat object %v/%v", folder, name)
+	}
+	return object, oinfo.ContentType, nil
 }

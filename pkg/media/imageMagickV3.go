@@ -83,16 +83,16 @@ func (im *ImageMagickV3) Resize(options *ImageOptions) error {
 		}
 
 		switch options.ActionType {
-		case "keep":
+		case ResizeActionTypeKeep:
 			nw, nh := CalcSizeMin(int64(im.mw.GetImageWidth()), int64(im.mw.GetImageHeight()), options.Width, options.Height)
 			if err := im.mw.ResizeImage(uint(nw), uint(nh), imagick.FILTER_LANCZOS); err != nil {
 				return errors.Wrapf(err, "cannot resizeimage(%v, %v)", uint(nw), uint(nh))
 			}
-		case "stretch":
+		case ResizeActionTypeStretch:
 			if err := im.mw.ResizeImage(uint(options.Width), uint(options.Height), imagick.FILTER_LANCZOS); err != nil {
 				return errors.Wrapf(err, "cannot resizeimage(%v, %v)", uint(options.Width), uint(options.Height))
 			}
-		case "crop":
+		case ResizeActionTypeCrop:
 			nw, nh := CalcSizeMax(int64(im.mw.GetImageWidth()), int64(im.mw.GetImageHeight()), options.Width, options.Height)
 			if err := im.mw.ResizeImage(uint(nw), uint(nh), imagick.FILTER_LANCZOS); err != nil {
 				return errors.Wrapf(err, "cannot resizeimage(%v, %v)", uint(nw), uint(nh))
@@ -102,7 +102,7 @@ func (im *ImageMagickV3) Resize(options *ImageOptions) error {
 			if err := im.mw.CropImage(uint(options.Width), uint(options.Height), int(x), int(y)); err != nil {
 				return errors.Wrapf(err, "cannot cropimage(%v, %v, %v, %v", uint(options.Width), uint(options.Height), int(x), int(y))
 			}
-		case "extent":
+		case ResizeActionTypeExtent:
 			nw, nh := CalcSizeMin(int64(im.mw.GetImageWidth()), int64(im.mw.GetImageHeight()), int64(options.Width), int64(options.Height))
 			if err := im.mw.ResizeImage(uint(nw), uint(nh), imagick.FILTER_LANCZOS); err != nil {
 				return errors.Wrapf(err, "cannot resizeimage(%v, %v)", uint(nw), uint(nh))
@@ -119,7 +119,7 @@ func (im *ImageMagickV3) Resize(options *ImageOptions) error {
 			if err := im.mw.ExtentImage(w, h, -x, -y); err != nil {
 				return errors.Wrapf(err, "cannot extentimage(%v, %v, %v, %v)", w, h, x, y)
 			}
-		case "backgroundblur":
+		case ResizeActionTypeBackgroundBlur:
 			foreground := im.mw.Clone()
 			defer foreground.Destroy()
 			nw, nh := CalcSizeMin(int64(im.mw.GetImageWidth()), int64(im.mw.GetImageHeight()), int64(options.Width), int64(options.Height))

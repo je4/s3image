@@ -18,6 +18,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v0.4.1
+	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/je4/utils/v2 v2.0.6
 )

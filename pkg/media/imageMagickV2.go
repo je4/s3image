@@ -1,3 +1,6 @@
+//go:build nobuild
+// +build nobuild
+
 package media
 
 import (

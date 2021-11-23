@@ -9,9 +9,19 @@ type ImageType interface {
 	Close()
 }
 
+type ResizeActionType string
+
+const (
+	ResizeActionTypeKeep           ResizeActionType = "keep"
+	ResizeActionTypeStretch        ResizeActionType = "stretch"
+	ResizeActionTypeCrop           ResizeActionType = "crop"
+	ResizeActionTypeExtent         ResizeActionType = "extent"
+	ResizeActionTypeBackgroundBlur ResizeActionType = "backgroundblur"
+)
+
 type ImageOptions struct {
 	Width, Height                       int64
-	ActionType                          string
+	ActionType                          ResizeActionType
 	TargetFormat                        string
 	OverlayCollection, OverlaySignature string
 	BackgroundColor                     string

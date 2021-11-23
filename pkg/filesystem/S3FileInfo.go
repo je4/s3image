@@ -15,14 +15,14 @@ func NewS3FileInfo(bucket, name string, info minio.ObjectInfo) *S3FileInfo {
 	}
 }
 
-// A FileInfo describes a file and is returned by Stat and Lstat.
+// S3FileInfo A FileInfo describes a file and is returned by Stat and Lstat.
 type S3FileInfo struct {
 	bucket, name string
 	info         minio.ObjectInfo
 }
 
 func (sfi *S3FileInfo) Name() string { // base name of the file
-	return fmt.Sprintf("%v/%v", sfi.bucket, sfi.name)
+	return fmt.Sprintf("%v/%v", sfi.bucket, sfi.info.Key)
 }
 
 func (sfi *S3FileInfo) Size() int64 { // length in bytes for regular files; system-dependent for others

@@ -1,4 +1,4 @@
-package s3image
+package main
 
 import (
 	"context"
@@ -15,12 +15,12 @@ import (
 )
 
 func main() {
-	cfgFile := flag.String("cfg", "/etc/fdp.toml", "locations of config file")
+	cfgFile := flag.String("cfg", "/etc/s3image.toml", "locations of config file")
 	flag.Parse()
 	config := LoadConfig(*cfgFile)
 
 	// create logger instance
-	logger, lf := lm.CreateLogger("FAIRService", config.Logfile, nil, config.Loglevel, config.Logformat)
+	logger, lf := lm.CreateLogger("S3Image", config.Logfile, nil, config.Loglevel, config.Logformat)
 	defer lf.Close()
 
 	fs, err := filesystem.NewS3Fs(config.S3.Endpoint, config.S3.AccessKeyId, config.S3.SecretAccessKey, config.S3.UseSSL)
@@ -47,8 +47,9 @@ func main() {
 	}
 
 	go func() {
+		logger.Infof("server starting at %s - %s", config.Addr, config.AddrExt)
 		if err := srv.ListenAndServe(config.CertPEM, config.KeyPEM); err != nil {
-			log.Fatalf("server died: %v", err)
+			logger.Fatalf("server died: %v", err)
 		}
 	}()
 
