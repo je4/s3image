@@ -12,7 +12,7 @@ variables:
 # repository in /go/src/gitlab.com/namespace/project
 # Thus, making a symbolic link corrects this.
 before_script:
-  - wget -o /tmp/imagick.tgz https://minio.campusderkuenste.ch/med-public/imagick-7.1.0.tgz
+  - wget -O /tmp/imagick.tgz https://minio.campusderkuenste.ch/med-public/imagick-7.1.0.tgz
   - cd /usr/local
   - tar xzf /tmp/imagick.tgz
   - ldconfig /usr/local/lib
