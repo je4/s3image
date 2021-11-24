@@ -13,7 +13,6 @@ variables:
 # Thus, making a symbolic link corrects this.
 before_script:
   - wget -o /tmp/imagick.tgz https://minio.campusderkuenste.ch/med-public/imagick-7.1.0.tgz
-  - mkdir -p /usr/local
   - cd /usr/local
   - tar xzf /tmp/imagick.tgz
   - ldconfig /usr/local/lib
