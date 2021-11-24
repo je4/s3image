@@ -11,6 +11,14 @@ type DummyDirEntry struct {
 	fileMode os.FileMode
 }
 
+func NewDummyDirEntry(name string) *DummyDirEntry {
+	return &DummyDirEntry{
+		name:     name,
+		isDir:    true,
+		fileMode: 0,
+	}
+}
+
 func (sdi DummyDirEntry) Name() string {
 	return sdi.name
 }

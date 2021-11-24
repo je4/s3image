@@ -7,18 +7,22 @@ import (
 )
 
 type Config struct {
-	ServiceName string           `toml:"servicename"`
-	Logfile     string           `toml:"logfile"`
-	Loglevel    string           `toml:"loglevel"`
-	Logformat   string           `toml:"logformat"`
-	AccessLog   string           `toml:"accesslog"`
-	Addr        string           `toml:"addr"`
-	AddrExt     string           `toml:"addrext"`
-	CertPEM     string           `toml:"certpem"`
-	KeyPEM      string           `toml:"keypem"`
-	UserName    string           `toml:"username"`
-	Password    string           `toml:"password"`
-	S3          configdata.CfgS3 `toml:"s3"`
+	ServiceName         string              `toml:"servicename"`
+	Logfile             string              `toml:"logfile"`
+	Loglevel            string              `toml:"loglevel"`
+	Logformat           string              `toml:"logformat"`
+	AccessLog           string              `toml:"accesslog"`
+	Addr                string              `toml:"addr"`
+	AddrExt             string              `toml:"addrext"`
+	CertPEM             string              `toml:"certpem"`
+	KeyPEM              string              `toml:"keypem"`
+	Buckets             map[string]string   `toml:"buckets"`
+	UserName            string              `toml:"username"`
+	Password            string              `toml:"password"`
+	S3                  configdata.CfgS3    `toml:"s3"`
+	S3CacheExp          configdata.Duration `toml:"s3cacheexp"`
+	CacheDir            string              `toml:"cachedir"`
+	ClearCacheOnStartup bool                `toml:"clearcacheonstartup"`
 }
 
 func LoadConfig(filepath string) Config {

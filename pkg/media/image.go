@@ -4,7 +4,7 @@ import "io"
 
 type ImageType interface {
 	LoadImage(reader io.Reader) error
-	StoreImage(format string) (io.Reader, *CoreMeta, error)
+	StoreImage(format string) (io.ReadCloser, *CoreMeta, error)
 	Resize(options *ImageOptions) error
 	Close()
 }

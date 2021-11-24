@@ -1,9 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"crypto/subtle"
 	"crypto/tls"
 	"fmt"
+	"github.com/Masterminds/sprig"
+	"github.com/dgraph-io/badger/v3"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/je4/s3image/v2/pkg/filesystem"
@@ -13,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"html/template"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -22,6 +27,7 @@ import (
 
 type Server struct {
 	service        string
+	addrExt        string
 	host, port     string
 	name, password string
 	srv            *http.Server
@@ -29,9 +35,25 @@ type Server struct {
 	accessLog      io.Writer
 	templates      map[string]*template.Template
 	fs             filesystem.FileSystem
+	db             *badger.DB
+	buckets        map[string]string
 }
 
-func NewServer(service, addr, name, password string, log *logging.Logger, accessLog io.Writer, fs filesystem.FileSystem) (*Server, error) {
+func BasicAuth(w http.ResponseWriter, r *http.Request, username, password, realm string) bool {
+
+	user, pass, ok := r.BasicAuth()
+
+	if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte(password)) != 1 {
+		w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
+		w.WriteHeader(401)
+		w.Write([]byte("Unauthorised.\n"))
+		return false
+	}
+
+	return true
+}
+
+func NewServer(service, addr, addrExt, name, password string, log *logging.Logger, accessLog io.Writer, fs filesystem.FileSystem, db *badger.DB, buckets map[string]string) (*Server, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot split address %s", addr)
@@ -39,6 +61,7 @@ func NewServer(service, addr, name, password string, log *logging.Logger, access
 
 	srv := &Server{
 		service:   service,
+		addrExt:   strings.TrimRight(addrExt, "/"),
 		host:      host,
 		port:      port,
 		name:      name,
@@ -47,6 +70,8 @@ func NewServer(service, addr, name, password string, log *logging.Logger, access
 		accessLog: accessLog,
 		templates: map[string]*template.Template{},
 		fs:        fs,
+		db:        db,
+		buckets:   buckets,
 	}
 
 	return srv, srv.InitTemplates()
@@ -54,7 +79,12 @@ func NewServer(service, addr, name, password string, log *logging.Logger, access
 
 func (s *Server) InitTemplates() error {
 	for key, val := range templateFiles {
-		tpl, err := template.ParseFS(templateFS, val)
+		text, err := fs.ReadFile(templateFS, val)
+		if err != nil {
+			return errors.Wrapf(err, "cannot read %s", val)
+		}
+		tpl, err := template.New("index").Funcs(sprig.FuncMap()).Parse(string(text))
+		//tpl, err := template.ParseFS(templateFS, val)
 		if err != nil {
 			return errors.Wrapf(err, "cannot parse template %s: %s", key, val)
 		}
@@ -63,6 +93,7 @@ func (s *Server) InitTemplates() error {
 	return nil
 }
 func (s *Server) IndexHandler(w http.ResponseWriter, req *http.Request) {
+	var err error
 	vars := mux.Vars(req)
 	path := strings.Trim(vars["path"], "/")
 
@@ -73,22 +104,43 @@ func (s *Server) IndexHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(fmt.Sprintf("invalid path %s", path)))
 		return
 	}
-
-	de, err := s.fs.FileList(parts[0], parts[1])
-	if err != nil {
-		if parts == nil {
-			s.log.Infof("cannot read folder %s: %v", path, err)
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(fmt.Sprintf("cannot read folder %s: %v", path, err)))
+	var name = parts[0]
+	var folder string
+	if len(parts) >= 2 {
+		folder = parts[1]
+	}
+	var de = []os.DirEntry{}
+	if name == "" {
+		for b, _ := range s.buckets {
+			de = append(de, filesystem.NewDummyDirEntry(b))
+		}
+	} else {
+		pw, ok := s.buckets[name]
+		if !ok {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(fmt.Sprintf("Bucket %s not available", name)))
 			return
 		}
-	}
+		if !BasicAuth(w, req, name, pw, "s3image:"+name) {
+			return
+		}
 
+		de, err = s.fs.FileList(name, folder)
+		if err != nil {
+			if parts == nil {
+				s.log.Infof("cannot read folder %s: %v", path, err)
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte(fmt.Sprintf("cannot read folder %s: %v", path, err)))
+				return
+			}
+		}
+	}
 	tpl := s.templates["index"]
 	if err := tpl.Execute(w, struct {
-		Path    string
-		Entries []os.DirEntry
-	}{path, de}); err != nil {
+		BasePath string
+		Path     string
+		Entries  []os.DirEntry
+	}{s.addrExt, path, de}); err != nil {
 		s.log.Errorf("error executing index template: %v", err)
 	}
 }
@@ -103,8 +155,23 @@ func (s *Server) MasterHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(fmt.Sprintf("cannot open file %s", path)))
 		return
 	}
+	var name = parts[0]
+	var folder string
+	if len(parts) >= 2 {
+		folder = parts[1]
+	}
 
-	r, contentType, err := s.fs.FileOpenRead(parts[0], parts[1], filesystem.FileGetOptions{})
+	pw, ok := s.buckets[name]
+	if !ok {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(fmt.Sprintf("Bucket %s not available", name)))
+		return
+	}
+	if !BasicAuth(w, req, name, pw, "s3image:"+name) {
+		return
+	}
+
+	r, contentType, err := s.fs.FileOpenRead(name, folder, filesystem.FileGetOptions{})
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(fmt.Sprintf("cannot open file %s", path)))
@@ -128,8 +195,51 @@ func (s *Server) ThumbHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(fmt.Sprintf("cannot open file %s", path)))
 		return
 	}
+	var name = parts[0]
+	var folder string
+	if len(parts) >= 2 {
+		folder = parts[1]
+	}
 
-	r, _, err := s.fs.FileOpenRead(parts[0], parts[1], filesystem.FileGetOptions{})
+	pw, ok := s.buckets[name]
+	if !ok {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(fmt.Sprintf("Bucket %s not available", name)))
+		return
+	}
+	if !BasicAuth(w, req, name, pw, "s3image:"+name) {
+		return
+	}
+
+	done := false
+	if err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte(path + "/thumb"))
+		if err != nil {
+			if err != badger.ErrKeyNotFound {
+				return errors.Wrapf(err, "cannot get %s from cache", path+"/thumb")
+			}
+			return nil
+		}
+		if err := item.Value(func(val []byte) error {
+			w.Header().Set("Content-type", "image/jpeg")
+			w.Write(val)
+			done = true
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "cannot get value for %s from cache", path+"/thumb")
+		}
+		return nil
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.log.Errorf("cannot read cache %v", err)
+		w.Write([]byte(fmt.Sprintf("cannot read cache %v", err)))
+		return
+	}
+	if done {
+		return
+	}
+
+	r, _, err := s.fs.FileOpenRead(name, folder, filesystem.FileGetOptions{})
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(fmt.Sprintf("cannot open file %s", path)))
@@ -165,12 +275,25 @@ func (s *Server) ThumbHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(fmt.Sprintf("store image %s", path)))
 		return
 	}
-	w.Header().Add("Content-type", "image/jpg")
-	if _, err := io.Copy(w, reader); err != nil {
+	defer reader.Close()
+
+	buf := bytes.NewBuffer(nil)
+	if _, err := io.Copy(buf, reader); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(fmt.Sprintf("output image %s", path)))
 		return
 	}
+	if err := s.db.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(path+"/thumb"), buf.Bytes())
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf("cannot output image to cache %s", err)))
+		return
+	}
+
+	w.Header().Add("Content-type", "image/jpg")
+	w.Write(buf.Bytes())
+
 }
 
 var thumbPath = regexp.MustCompile("^(?P<path>.+)/thumb$")

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type S3Fs struct {
@@ -21,6 +22,7 @@ type S3Fs struct {
 func NewS3Fs(Endpoint string,
 	AccessKeyId string,
 	SecretAccessKey string,
+	Expiration time.Duration,
 	UseSSL bool) (*S3Fs, error) {
 	// connect to S3 / Minio
 	s3, err := minio.New(Endpoint, &minio.Options{
@@ -30,7 +32,8 @@ func NewS3Fs(Endpoint string,
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot connect to s3 instance")
 	}
-	return &S3Fs{s3: s3, endpoint: Endpoint}, nil
+	s3fs := &S3Fs{s3: s3, endpoint: Endpoint}
+	return s3fs, nil
 }
 
 func (fs *S3Fs) Protocol() string {
@@ -42,48 +45,52 @@ func (fs *S3Fs) String() string {
 }
 
 func (fs *S3Fs) FileList(folder, name string) ([]os.DirEntry, error) {
+	name = strings.TrimRight(name, "/")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	objectCh := fs.s3.ListObjects(ctx, folder, minio.ListObjectsOptions{
-		Prefix:    name,
-		Recursive: true,
-	})
 	var result = []os.DirEntry{}
-	var subDirs = []string{}
-	for object := range objectCh {
-		subPath := strings.Trim(strings.TrimPrefix(object.Key, name), "/")
-		if subPath == "" {
-			continue
+	if folder == "" {
+		bi, err := fs.s3.ListBuckets(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot list buckets")
 		}
-		if strings.ContainsRune(subPath, '/') {
-			subDir := subPath[:strings.IndexByte(subPath, '/')]
-			found := false
-			for _, d := range subDirs {
-				if d == subDir {
-					found = true
-					break
-				}
-			}
-			if !found {
-				subDirs = append(subDirs, subDir)
-			}
-			continue
+		for _, b := range bi {
+			result = append(result, DummyDirEntry{
+				name:     b.Name,
+				isDir:    true,
+				fileMode: 0,
+			})
 		}
-		result = append(result, S3DirEntry{
-			S3FileInfo{
-				bucket: folder,
-				name:   name,
-				info:   object,
-			},
+	} else {
+		n := name
+		if n != "" {
+			n += "/"
+		}
+		objectCh := fs.s3.ListObjects(ctx, folder, minio.ListObjectsOptions{
+			Prefix:    n,
+			Recursive: false,
 		})
-	}
-	for _, d := range subDirs {
-		subDir := fmt.Sprintf("%s/%s", name, d)
-		result = append(result, DummyDirEntry{
-			name:     fmt.Sprintf("%s/%s", folder, subDir),
-			isDir:    true,
-			fileMode: 0,
-		})
+		for object := range objectCh {
+			subPath := strings.Trim(strings.TrimPrefix(object.Key, name), "/")
+			if subPath == "" {
+				continue
+			}
+			if object.ETag == "" {
+				result = append(result, DummyDirEntry{
+					name:     fmt.Sprintf("%s/%s", folder, object.Key),
+					isDir:    true,
+					fileMode: 0,
+				})
+			} else {
+				result = append(result, S3DirEntry{
+					S3FileInfo{
+						bucket: folder,
+						name:   name,
+						info:   object,
+					},
+				})
+			}
+		}
 	}
 	return result, nil
 }

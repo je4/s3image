@@ -36,7 +36,7 @@ func (im *ImageMagickV3) LoadImage(reader io.Reader) error {
 	return nil
 }
 
-func (im *ImageMagickV3) StoreImage(format string) (io.Reader, *CoreMeta, error) {
+func (im *ImageMagickV3) StoreImage(format string) (io.ReadCloser, *CoreMeta, error) {
 	var buf *bytes.Reader
 	if err := im.mw.SetFormat(format); err != nil {
 		return nil, nil, errors.Wrapf(err, "cannot set format %s", format)
@@ -56,7 +56,7 @@ func (im *ImageMagickV3) StoreImage(format string) (io.Reader, *CoreMeta, error)
 		Mimetype: "application/octet-stream",
 		Size:     buf.Size(),
 	}
-	return buf, cm, nil
+	return io.NopCloser(buf), cm, nil
 }
 
 func (im *ImageMagickV3) Resize(options *ImageOptions) error {
