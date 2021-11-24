@@ -37,7 +37,7 @@ compile:
   stage: build
   script:
     - go mod download
-    - CGO_ENABLED=0 go build -o $CI_PROJECT_DIR/s3image ./cmd/s3image
+    - go build -o $CI_PROJECT_DIR/s3image ./cmd/s3image
   artifacts:
     paths:
       - s3image
