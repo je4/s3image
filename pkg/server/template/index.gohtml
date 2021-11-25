@@ -1,7 +1,7 @@
-
 <!doctype html>
 <html lang="en">
 <head>
+    {{$basePath := .BasePath}}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="">
@@ -78,7 +78,7 @@
                 <div class="col" style="max-width: 300px;">
                     <div class="card shadow-sm">
                         {{if not $e.IsDir}}
-                        <img src="/{{$e.Name}}/thumb" loading="lazy" />
+                        <img src="{{$basePath}}/{{$e.Name}}/thumb" loading="lazy" />
                         {{end}}
 
                         <div class="card-body">
@@ -86,9 +86,9 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="btn-group">
                                     {{if $e.IsDir}}
-                                        <a href="/{{$e.Name}}" type="button" class="btn btn-sm btn-outline-secondary">Open</a>
+                                        <a href="{{$basePath}}/{{$e.Name}}" type="button" class="btn btn-sm btn-outline-secondary">Open</a>
                                     {{else}}
-                                    <a href="/{{$e.Name}}/master" target="_blank" type="button" class="btn btn-sm btn-outline-secondary">View</a>
+                                    <a href="{{$basePath}}/{{$e.Name}}/master" target="_blank" type="button" class="btn btn-sm btn-outline-secondary">View</a>
                                     {{end}}
                                 </div>
                             </div>
