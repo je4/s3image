@@ -1,5 +1,5 @@
 # This file is a template, and might need editing before it works on your project.
-image: golang:latest
+image: cr.gitlab.fhnw.ch/hgk-dima/containers/goimagemagick:latest
 
 variables:
   # Please edit to your GitLab project
@@ -12,10 +12,6 @@ variables:
 # repository in /go/src/gitlab.com/namespace/project
 # Thus, making a symbolic link corrects this.
 before_script:
-  - wget -O /tmp/imagick.tgz https://minio.campusderkuenste.ch/med-public/imagick-7.1.0.tgz
-  - cd /usr/local
-  - tar xzf /tmp/imagick.tgz
-  - ldconfig /usr/local/lib
   - mkdir -p $GOPATH/src/$(dirname $REPO_NAME)
   - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_NAME
   - cd $GOPATH/src/$REPO_NAME
