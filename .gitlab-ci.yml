@@ -2,7 +2,7 @@
 image: cr.gitlab.fhnw.ch/hgk-dima/containers/goimagemagick:latest
 
 variables:
-  # Please edit to your GitLab project
+   # Please edit to your GitLab project
   REPO_NAME: hgk.fhnw.ch/s3image
 
 # The problem is that to be able to use go get, one needs to put
