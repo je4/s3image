@@ -97,7 +97,7 @@ func main() {
 	}
 	defer db.Close()
 
-	srv, err := server.NewServer(config.ServiceName, config.Addr, config.AddrExt, config.UserName, config.Password, logger, accessLog, fs, db, config.Buckets)
+	srv, err := server.NewServer(config.ServiceName, config.Addr, config.AddrExt, config.UserName, config.Password, logger, accessLog, fs, db, config.Buckets, config.Templates)
 	if err != nil {
 		logger.Panicf("cannot start server: %v", err)
 	}

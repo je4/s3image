@@ -37,6 +37,7 @@ type Server struct {
 	fs             filesystem.FileSystem
 	db             *badger.DB
 	buckets        map[string]string
+	templateFiles  map[string]string
 }
 
 func BasicAuth(w http.ResponseWriter, r *http.Request, username, password, realm string) bool {
@@ -53,42 +54,58 @@ func BasicAuth(w http.ResponseWriter, r *http.Request, username, password, realm
 	return true
 }
 
-func NewServer(service, addr, addrExt, name, password string, log *logging.Logger, accessLog io.Writer, fs filesystem.FileSystem, db *badger.DB, buckets map[string]string) (*Server, error) {
+func NewServer(service, addr, addrExt, name, password string, log *logging.Logger, accessLog io.Writer, fs filesystem.FileSystem, db *badger.DB, buckets, templateFiles map[string]string) (*Server, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot split address %s", addr)
 	}
 
 	srv := &Server{
-		service:   service,
-		addrExt:   strings.TrimRight(addrExt, "/"),
-		host:      host,
-		port:      port,
-		name:      name,
-		password:  password,
-		log:       log,
-		accessLog: accessLog,
-		templates: map[string]*template.Template{},
-		fs:        fs,
-		db:        db,
-		buckets:   buckets,
+		service:       service,
+		addrExt:       strings.TrimRight(addrExt, "/"),
+		host:          host,
+		port:          port,
+		name:          name,
+		password:      password,
+		log:           log,
+		accessLog:     accessLog,
+		templates:     map[string]*template.Template{},
+		fs:            fs,
+		db:            db,
+		buckets:       buckets,
+		templateFiles: templateFiles,
 	}
 
 	return srv, srv.InitTemplates()
 }
 
 func (s *Server) InitTemplates() error {
-	for key, val := range templateFiles {
-		text, err := fs.ReadFile(templateFS, val)
-		if err != nil {
-			return errors.Wrapf(err, "cannot read %s", val)
+	if len(s.templateFiles) > 0 {
+		for key, val := range s.templateFiles {
+			text, err := os.ReadFile(val)
+			if err != nil {
+				return errors.Wrapf(err, "cannot read %s", val)
+			}
+			tpl, err := template.New("index").Funcs(sprig.FuncMap()).Parse(string(text))
+			//tpl, err := template.ParseFS(templateFS, val)
+			if err != nil {
+				return errors.Wrapf(err, "cannot parse template %s: %s", key, val)
+			}
+			s.templates[key] = tpl
 		}
-		tpl, err := template.New("index").Funcs(sprig.FuncMap()).Parse(string(text))
-		//tpl, err := template.ParseFS(templateFS, val)
-		if err != nil {
-			return errors.Wrapf(err, "cannot parse template %s: %s", key, val)
+	} else {
+		for key, val := range templateFiles {
+			text, err := fs.ReadFile(templateFS, val)
+			if err != nil {
+				return errors.Wrapf(err, "cannot read %s", val)
+			}
+			tpl, err := template.New("index").Funcs(sprig.FuncMap()).Parse(string(text))
+			//tpl, err := template.ParseFS(templateFS, val)
+			if err != nil {
+				return errors.Wrapf(err, "cannot parse template %s: %s", key, val)
+			}
+			s.templates[key] = tpl
 		}
-		s.templates[key] = tpl
 	}
 	return nil
 }
@@ -250,7 +267,7 @@ func (s *Server) ThumbHandler(w http.ResponseWriter, req *http.Request) {
 	image, err = media.NewImageMagickV3(r)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf("read image %s", path)))
+		w.Write([]byte(fmt.Sprintf("error reading image %s: %v", path, err)))
 		return
 	}
 	defer image.Close()

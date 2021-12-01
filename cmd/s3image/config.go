@@ -22,6 +22,7 @@ type Config struct {
 	S3                  configdata.CfgS3    `toml:"s3"`
 	S3CacheExp          configdata.Duration `toml:"s3cacheexp"`
 	CacheDir            string              `toml:"cachedir"`
+	Templates           map[string]string   `toml:"template"`
 	ClearCacheOnStartup bool                `toml:"clearcacheonstartup"`
 }
 
