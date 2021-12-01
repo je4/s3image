@@ -4,6 +4,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/je4/zsearch/v2/configdata"
 	"log"
+	"os"
 )
 
 type Config struct {
@@ -33,5 +34,14 @@ func LoadConfig(filepath string) Config {
 	if err != nil {
 		log.Fatalln("Error on loading config: ", err)
 	}
+
+	clearcache := os.Getenv("S3IMAGE_CLEARCACHE")
+	switch clearcache {
+	case "true":
+		conf.ClearCacheOnStartup = true
+	case "false":
+		conf.ClearCacheOnStartup = false
+	}
+
 	return conf
 }
