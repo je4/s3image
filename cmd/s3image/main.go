@@ -26,9 +26,22 @@ func main() {
 	logger, lf := lm.CreateLogger("S3Image", config.Logfile, nil, config.Loglevel, config.Logformat)
 	defer lf.Close()
 
-	fs, err := filesystem.NewS3Fs(config.S3.Endpoint, config.S3.AccessKeyId, config.S3.SecretAccessKey, config.S3CacheExp.Duration, config.S3.UseSSL)
-	if err != nil {
-		logger.Fatalf("cannot conntct to s3 instance: %v", err)
+	var fs filesystem.FileSystem
+	var err error
+
+	switch config.Filesystem {
+	case "s3":
+		fs, err = filesystem.NewS3Fs(config.S3.Endpoint, config.S3.AccessKeyId, config.S3.SecretAccessKey, config.S3CacheExp.Duration, config.S3.UseSSL)
+		if err != nil {
+			logger.Fatalf("cannot connect to s3 instance: %v", err)
+		}
+	case "local":
+		fs, err = filesystem.NewLocalFs(config.Local.Path, logger)
+		if err != nil {
+			logger.Fatalf("cannot create local filesystem at %s: %v", config.Local.Path, err)
+		}
+	default:
+		logger.Fatalf("unknown filesystem %s", config.Filesystem)
 	}
 	var accessLog io.Writer
 	var f *os.File

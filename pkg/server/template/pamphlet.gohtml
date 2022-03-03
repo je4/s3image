@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+    {{$basePath := .BasePath}}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="Jürgen Enge (juergen@info-age.net)">
+    <title>Album Mediathek HGK FHNW</title>
+
+</head>
+<body>
+            <div id="flipbook">
+                <div class="hard"> {{.Path}} </div>
+                <div class="hard"></div>
+            {{range $e := .Entries}}
+                <div style="background-image:url({{$basePath}}/{{$e.Name}}/page)"></div>
+            {{end}}
+                <div class="hard"></div>
+                <div class="hard"></div>
+            </div>
+
+
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+        integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ="
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"
+        integrity="sha512-rFun1mEMg3sNDcSjeGP35cLIycsS+og/QtN6WWnoSviHU9ykMLNQp7D1uuG1AzTV2w0VmyFVpszi2QJwiVW6oQ=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
+<script type="text/javascript">
+    window.onload = function() {
+        $("#flipbook").turn({
+            width: 800,
+            height: 300,
+            autoCenter: true
+        });
+    }
+</script>
+</body>
+</html>
+

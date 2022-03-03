@@ -7,6 +7,10 @@ import (
 	"os"
 )
 
+type LocalFS struct {
+	Path string `toml:"path"`
+}
+
 type Config struct {
 	ServiceName         string              `toml:"servicename"`
 	Logfile             string              `toml:"logfile"`
@@ -25,6 +29,8 @@ type Config struct {
 	CacheDir            string              `toml:"cachedir"`
 	Templates           map[string]string   `toml:"template"`
 	ClearCacheOnStartup bool                `toml:"clearcacheonstartup"`
+	Filesystem          string              `toml:"filesystem"`
+	Local               LocalFS             `toml:"local"`
 }
 
 func LoadConfig(filepath string) Config {

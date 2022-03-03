@@ -162,6 +162,59 @@ func (s *Server) IndexHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (s *Server) BookHandler(w http.ResponseWriter, req *http.Request) {
+	var err error
+	vars := mux.Vars(req)
+	path := strings.Trim(vars["path"], "/")
+
+	parts := strings.SplitN(path, "/", 2)
+	if parts == nil {
+		s.log.Infof("invalid path %s", path)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("invalid path %s", path)))
+		return
+	}
+	var name = parts[0]
+	var folder string
+	if len(parts) >= 2 {
+		folder = parts[1]
+	}
+	var de = []os.DirEntry{}
+	if name == "" {
+		for b, _ := range s.buckets {
+			de = append(de, filesystem.NewDummyDirEntry(b))
+		}
+	} else {
+		pw, ok := s.buckets[name]
+		if !ok {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(fmt.Sprintf("Bucket %s not available", name)))
+			return
+		}
+		if !BasicAuth(w, req, name, pw, "s3image:"+name) {
+			return
+		}
+
+		de, err = s.fs.FileList(name, folder)
+		if err != nil {
+			if parts == nil {
+				s.log.Infof("cannot read folder %s: %v", path, err)
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte(fmt.Sprintf("cannot read folder %s: %v", path, err)))
+				return
+			}
+		}
+	}
+	tpl := s.templates["pamphlet"]
+	if err := tpl.Execute(w, struct {
+		BasePath string
+		Path     string
+		Entries  []os.DirEntry
+	}{s.addrExt, path, de}); err != nil {
+		s.log.Errorf("error executing index template: %v", err)
+	}
+}
+
 func (s *Server) MasterHandler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	path := strings.TrimPrefix(vars["path"], "/")
@@ -313,8 +366,121 @@ func (s *Server) ThumbHandler(w http.ResponseWriter, req *http.Request) {
 
 }
 
+func (s *Server) BookPageHandler(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	path := strings.TrimPrefix(vars["path"], "/")
+
+	parts := strings.SplitN(path, "/", 2)
+	if parts == nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("cannot open file %s", path)))
+		return
+	}
+	var name = parts[0]
+	var folder string
+	if len(parts) >= 2 {
+		folder = parts[1]
+	}
+
+	pw, ok := s.buckets[name]
+	if !ok {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(fmt.Sprintf("Bucket %s not available", name)))
+		return
+	}
+	if !BasicAuth(w, req, name, pw, "s3image:"+name) {
+		return
+	}
+
+	done := false
+	if err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte(path + "/page"))
+		if err != nil {
+			if err != badger.ErrKeyNotFound {
+				return errors.Wrapf(err, "cannot get %s from cache", path+"/thumb")
+			}
+			return nil
+		}
+		if err := item.Value(func(val []byte) error {
+			w.Header().Set("Content-type", "image/jpeg")
+			w.Write(val)
+			done = true
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "cannot get value for %s from cache", path+"/thumb")
+		}
+		return nil
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.log.Errorf("cannot read cache %v", err)
+		w.Write([]byte(fmt.Sprintf("cannot read cache %v", err)))
+		return
+	}
+	if done {
+		return
+	}
+
+	r, _, err := s.fs.FileOpenRead(name, folder, filesystem.FileGetOptions{})
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("cannot open file %s", path)))
+		return
+	}
+
+	var image media.ImageType
+	image, err = media.NewImageMagickV3(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf("error reading image %s: %v", path, err)))
+		return
+	}
+	defer image.Close()
+
+	imageOptions := &media.ImageOptions{
+		Width:             600,
+		Height:            800,
+		ActionType:        media.ResizeActionTypeKeep,
+		TargetFormat:      "JPEG",
+		OverlayCollection: "",
+		OverlaySignature:  "",
+		BackgroundColor:   "",
+	}
+	if err := image.Resize(imageOptions); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf("resize image %s", path)))
+		return
+	}
+	reader, _, err := image.StoreImage("JPEG")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf("store image %s", path)))
+		return
+	}
+	defer reader.Close()
+
+	buf := bytes.NewBuffer(nil)
+	if _, err := io.Copy(buf, reader); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf("output image %s", path)))
+		return
+	}
+	if err := s.db.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(path+"/page"), buf.Bytes())
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf("cannot output image to cache %s", err)))
+		return
+	}
+
+	w.Header().Add("Content-type", "image/jpg")
+	w.Write(buf.Bytes())
+
+}
+
 var thumbPath = regexp.MustCompile("^(?P<path>.+)/thumb$")
+var pagePath = regexp.MustCompile("^(?P<path>.+)/page$")
 var masterPath = regexp.MustCompile("^(?P<path>.+)/master$")
+var bookPath = regexp.MustCompile("^(?P<path>.+)/book$")
 var indexPath = regexp.MustCompile("^(?P<path>.+)$")
 
 func (s *Server) ListenAndServe(cert, key string) (err error) {
@@ -333,13 +499,37 @@ func (s *Server) ListenAndServe(cert, key string) (err error) {
 			if strings.HasSuffix(matches[i], "/thumb") {
 				return false
 			}
+			if strings.HasSuffix(matches[i], "/page") {
+				return false
+			}
 			if strings.HasSuffix(matches[i], "/master") {
+				return false
+			}
+			if strings.HasSuffix(matches[i], "/book") {
 				return false
 			}
 			match.Vars[name] = matches[i]
 		}
 		return true
 	}).Methods("GET", "HEAD").HandlerFunc(s.IndexHandler)
+
+	router.MatcherFunc(func(request *http.Request, match *mux.RouteMatch) bool {
+		matches := indexPath.FindStringSubmatch(request.URL.Path)
+		if matches == nil {
+			return false
+		}
+		match.Vars = map[string]string{}
+		for i, name := range indexPath.SubexpNames() {
+			if name == "" {
+				continue
+			}
+			if !strings.HasSuffix(matches[i], "/book") {
+				return false
+			}
+			match.Vars[name] = strings.TrimRight(matches[i], "/book")
+		}
+		return true
+	}).Methods("GET", "HEAD").HandlerFunc(s.BookHandler)
 
 	router.MatcherFunc(func(request *http.Request, match *mux.RouteMatch) bool {
 		matches := thumbPath.FindStringSubmatch(request.URL.Path)
@@ -355,6 +545,21 @@ func (s *Server) ListenAndServe(cert, key string) (err error) {
 		}
 		return true
 	}).Methods("GET", "HEAD").HandlerFunc(s.ThumbHandler)
+
+	router.MatcherFunc(func(request *http.Request, match *mux.RouteMatch) bool {
+		matches := pagePath.FindStringSubmatch(request.URL.Path)
+		if matches == nil {
+			return false
+		}
+		match.Vars = map[string]string{}
+		for i, name := range pagePath.SubexpNames() {
+			if name == "" {
+				continue
+			}
+			match.Vars[name] = matches[i]
+		}
+		return true
+	}).Methods("GET", "HEAD").HandlerFunc(s.BookPageHandler)
 
 	router.MatcherFunc(func(request *http.Request, match *mux.RouteMatch) bool {
 		matches := masterPath.FindStringSubmatch(request.URL.Path)
