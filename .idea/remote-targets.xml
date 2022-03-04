@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="RemoteTargetsManager">
+    <option name="projectDefaultTargetUuid" value="fbc6e87d-17ee-47aa-aa20-3c1d7e6b28be" />
     <targets>
       <target name="root@localhost:22" type="ssh/sftp" uuid="103caa65-ab90-43d7-a77e-ee1123c574a7">
         <config>
-          <option name="projectRootOnTarget" value="/mnt/c/daten/go/dev/s3image" />
-          <option name="serverName" value="root@localhost:22 key" />
+          <option name="projectRootOnTarget" value="/home/je/go/dev/s3image" />
+          <option name="serverName" value="je@localhost:22 key" />
+          <option name="useRsync" value="true" />
         </config>
         <ContributedStateBase type="GoLanguageRuntime">
           <config>
-            <option name="goPath" value="/mnt/c/daten/go/dev" />
+            <option name="goPath" value="/home/je/go" />
             <option name="goRoot" value="/usr/local/go/bin/go" />
           </config>
         </ContributedStateBase>
       </target>
-      <target name="WSL - Ubuntu" type="wsl" uuid="fbc6e87d-17ee-47aa-aa20-3c1d7e6b28be">
+      <target name="WSL - Ubuntu" type="wsl" uuid="f2e069e9-7a70-46bc-a4df-4c2c0950a8fc">
         <config>
           <option name="distributionMsId" value="Ubuntu" />
-          <option name="projectRootOnTarget" value="/mnt/c/Program Files/JetBrains/GoLand 2021.3/jbr/bin&#10;/s3image" />
+          <option name="projectRootOnTarget" value="/mnt/c/Program Files/JetBrains/GoLand 2021.3.3/jbr/bin&#10;/s3image" />
         </config>
         <ContributedStateBase type="GoLanguageRuntime">
           <config>
-            <option name="goPath" value="/mnt/c/daten/go/dev" />
+            <option name="goPath" value="/home/je/go" />
             <option name="goRoot" value="/usr/local/go/bin/go" />
-            <option name="goVersion" value="go1.17.3 linux/amd64" />
+            <option name="goVersion" value="go1.17.8 linux/amd64" />
           </config>
         </ContributedStateBase>
       </target>

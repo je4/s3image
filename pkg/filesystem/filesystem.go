@@ -3,7 +3,7 @@ package filesystem
 import (
 	"fmt"
 	"io"
-	"os"
+	"io/fs"
 )
 
 type NotFoundError struct {
@@ -46,8 +46,8 @@ type FileSystem interface {
 	FileWrite(folder, name string, r io.Reader, size int64, opts FilePutOptions) error
 	FileRead(folder, name string, w io.Writer, size int64, opts FileGetOptions) error
 	FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadCloser, string, error)
-	FileStat(folder, name string, opts FileStatOptions) (os.FileInfo, error)
-	FileList(folder, name string) ([]os.DirEntry, error)
+	FileStat(folder, name string, opts FileStatOptions) (fs.FileInfo, error)
+	FileList(folder, name string) ([]fs.DirEntry, error)
 	String() string
 	Protocol() string
 }

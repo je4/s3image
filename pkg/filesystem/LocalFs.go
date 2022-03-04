@@ -5,6 +5,7 @@ import (
 	logging "github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -38,34 +39,34 @@ func NewLocalFs(basepath string, logger *logging.Logger) (*LocalFs, error) {
 	return &LocalFs{basepath: basepath, logger: logger}, nil
 }
 
-func (fs *LocalFs) Protocol() string {
+func (lfs *LocalFs) Protocol() string {
 	return "file://"
 }
 
-func (fs *LocalFs) String() string {
-	return fs.basepath
+func (lfs *LocalFs) String() string {
+	return lfs.basepath
 }
 
-func (fs *LocalFs) FileStat(folder, name string, opts FileStatOptions) (os.FileInfo, error) {
+func (lfs *LocalFs) FileStat(folder, name string, opts FileStatOptions) (os.FileInfo, error) {
 	path := filepath.Join(folder, name)
-	return os.Stat(filepath.Join(fs.basepath, path))
+	return os.Stat(filepath.Join(lfs.basepath, path))
 }
 
-func (fs *LocalFs) FileExists(folder, name string) (bool, error) {
+func (lfs *LocalFs) FileExists(folder, name string) (bool, error) {
 	path := filepath.Join(folder, name)
-	return FileExists(filepath.Join(fs.basepath, path)), nil
+	return FileExists(filepath.Join(lfs.basepath, path)), nil
 }
 
-func (fs *LocalFs) FolderExists(folder string) (bool, error) {
-	return FolderExists(filepath.Join(fs.basepath, folder)), nil
+func (lfs *LocalFs) FolderExists(folder string) (bool, error) {
+	return FolderExists(filepath.Join(lfs.basepath, folder)), nil
 }
 
-func (fs *LocalFs) FolderCreate(folder string, opts FolderCreateOptions) error {
-	path := filepath.Join(fs.basepath, folder)
+func (lfs *LocalFs) FolderCreate(folder string, opts FolderCreateOptions) error {
+	path := filepath.Join(lfs.basepath, folder)
 	if FolderExists(path) {
 		return nil
 	}
-	fs.logger.Debugf("create folder %v", path)
+	lfs.logger.Debugf("create folder %v", path)
 	err := os.MkdirAll(path, 0755)
 	if err != nil {
 		return errors.Wrapf(err, "cannot create folder %v", path)
@@ -73,33 +74,33 @@ func (fs *LocalFs) FolderCreate(folder string, opts FolderCreateOptions) error {
 	return nil
 }
 
-func (fs *LocalFs) FileGet(folder, name string, opts FileGetOptions) ([]byte, error) {
+func (lfs *LocalFs) FileGet(folder, name string, opts FileGetOptions) ([]byte, error) {
 	path := filepath.Join(folder, name)
-	data, err := ioutil.ReadFile(filepath.Join(fs.basepath, path))
+	data, err := ioutil.ReadFile(filepath.Join(lfs.basepath, path))
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot read file %v", path)
 	}
 	return data, nil
 }
 
-func (fs *LocalFs) FilePut(folder, name string, data []byte, opts FilePutOptions) error {
-	if err := fs.FolderCreate(folder, FolderCreateOptions{}); err != nil {
+func (lfs *LocalFs) FilePut(folder, name string, data []byte, opts FilePutOptions) error {
+	if err := lfs.FolderCreate(folder, FolderCreateOptions{}); err != nil {
 		return errors.Wrapf(err, "cannot create folder %v", folder)
 	}
-	path := filepath.Join(fs.basepath, filepath.Join(folder, name))
-	fs.logger.Debugf("writing data to: %v", path)
+	path := filepath.Join(lfs.basepath, filepath.Join(folder, name))
+	lfs.logger.Debugf("writing data to: %v", path)
 	if err := ioutil.WriteFile(path, data, 0644); err != nil {
 		return errors.Wrapf(err, "cannot write data to %v", path)
 	}
 	return nil
 }
 
-func (fs *LocalFs) FileWrite(folder, name string, r io.Reader, size int64, opts FilePutOptions) error {
-	if err := fs.FolderCreate(folder, FolderCreateOptions{}); err != nil {
+func (lfs *LocalFs) FileWrite(folder, name string, r io.Reader, size int64, opts FilePutOptions) error {
+	if err := lfs.FolderCreate(folder, FolderCreateOptions{}); err != nil {
 		return errors.Wrapf(err, "cannot create folder %v", folder)
 	}
 	path := filepath.Join(folder, name)
-	file, err := os.OpenFile(filepath.Join(fs.basepath, path), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(filepath.Join(lfs.basepath, path), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return errors.Wrapf(err, "cannot open file %v", path)
 	}
@@ -118,9 +119,9 @@ func (fs *LocalFs) FileWrite(folder, name string, r io.Reader, size int64, opts 
 	return nil
 }
 
-func (fs *LocalFs) FileRead(folder, name string, w io.Writer, size int64, opts FileGetOptions) error {
+func (lfs *LocalFs) FileRead(folder, name string, w io.Writer, size int64, opts FileGetOptions) error {
 	path := filepath.Join(folder, name)
-	file, err := os.OpenFile(filepath.Join(fs.basepath, path), os.O_RDONLY, 0644)
+	file, err := os.OpenFile(filepath.Join(lfs.basepath, path), os.O_RDONLY, 0644)
 	if err != nil {
 		return errors.Wrapf(err, "cannot open file %v", path)
 	}
@@ -137,9 +138,9 @@ func (fs *LocalFs) FileRead(folder, name string, w io.Writer, size int64, opts F
 	return nil
 }
 
-func (fs *LocalFs) FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadCloser, string, error) {
+func (lfs *LocalFs) FileOpenRead(folder, name string, opts FileGetOptions) (io.ReadCloser, string, error) {
 	path := filepath.Join(folder, name)
-	file, err := os.OpenFile(filepath.Join(fs.basepath, path), os.O_RDONLY, 0644)
+	file, err := os.OpenFile(filepath.Join(lfs.basepath, path), os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "cannot open file %v", path)
 	}
@@ -147,12 +148,22 @@ func (fs *LocalFs) FileOpenRead(folder, name string, opts FileGetOptions) (io.Re
 	return file, "application/octet-stream", nil
 }
 
-func (fs *LocalFs) FileList(folder, name string) ([]os.DirEntry, error) {
+func (lfs *LocalFs) FileList(folder, name string) ([]fs.DirEntry, error) {
 	path := filepath.Join(folder, name)
-	fullpath := filepath.Join(fs.basepath, path)
+	fullpath := filepath.Join(lfs.basepath, path)
 	de, err := os.ReadDir(fullpath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot read %s", fullpath)
 	}
-	return de, nil
+	var list = []fs.DirEntry{}
+	for _, e := range de {
+		fp := filepath.Join(path, e.Name())
+		fi, err := os.Stat(filepath.Join(lfs.basepath, fp))
+		if err != nil {
+			return nil, errors.Wrapf(err, "cannot stat %s", fp)
+		}
+		lde := LocalDirEntry{FileInfo: fi, bucket: path}
+		list = append(list, lde)
+	}
+	return list, nil
 }
