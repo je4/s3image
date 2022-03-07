@@ -36,6 +36,7 @@ type Config struct {
 func LoadConfig(filepath string) Config {
 	var conf Config
 	conf.Logformat = "%{time:2006-01-02T15:04:05.000} %{module}::%{shortfunc} [%{shortfile}] > %{level:.5s} - %{message}"
+	conf.Filesystem = "s3"
 	_, err := toml.DecodeFile(filepath, &conf)
 	if err != nil {
 		log.Fatalln("Error on loading config: ", err)
